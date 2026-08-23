@@ -1,0 +1,116 @@
+name: CI/CD Pipeline — FitTrack
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan for exposed secrets with TruffleHog
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+
+  deploy:
+    name: Deploy Infrastructure and Application
+    runs-on: ubuntu-latest
+    needs: security-scan
+
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: us-east-1
+
+    steps:
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create SSH private key file
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/devops-key.pem
+          chmod 600 ~/.ssh/devops-key.pem
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="region=us-east-1"
+
+      - name: Terraform Validate
+        working-directory: terraform
+        run: terraform validate
+
+      - name: Terraform Plan
+        working-directory: terraform
+        run: terraform plan
+
+      - name: Terraform Apply
+        working-directory: terraform
+        run: terraform apply -auto-approve
+
+      - name: Get EC2 Public IP
+        id: tf-ip
+        working-directory: terraform
+        run: echo "ip=$(terraform output -raw ec2_public_ip)" >> $GITHUB_OUTPUT
+
+      - name: Install Ansible
+        run: sudo apt-get update && sudo apt-get install -y ansible
+
+      - name: Disable host key checking
+        run: echo "ANSIBLE_HOST_KEY_CHECKING=False" >> $GITHUB_ENV
+
+      - name: Create Ansible inventory
+        working-directory: ansible
+        run: |
+          echo "[web]" > inventory
+          echo "${{ steps.tf-ip.outputs.ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/devops-key.pem" >> inventory
+
+      - name: Wait for SSH to become available
+        run: |
+          echo "Waiting for EC2 to be reachable..."
+          for i in {1..10}; do
+            if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 \
+              -i ~/.ssh/devops-key.pem ubuntu@${{ steps.tf-ip.outputs.ip }} \
+              "echo SSH ready" 2>/dev/null; then
+              echo "✅ SSH is available"
+              break
+            fi
+            echo "Attempt $i: not ready, retrying in 15s..."
+            sleep 15
+          done
+
+      - name: Run Ansible Playbook
+        working-directory: ansible
+        run: ansible-playbook -i inventory playbook.yml
+
+      - name: Health Check
+        run: |
+          sleep 5
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://${{ steps.tf-ip.outputs.ip }})
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ Health check passed — app is live"
+          else
+            echo "❌ Health check failed — HTTP status: $STATUS"
+            exit 1
+          fi
+
+      - name: Deployment Complete
+        run: |
+          echo "🚀 FitTrack deployed successfully"
+          echo "🌍 Live at: http://${{ steps.tf-ip.outputs.ip }}"

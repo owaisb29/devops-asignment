@@ -1,0 +1,76 @@
+---
+- name: Deploy FitTrack Workout Tracker
+  hosts: web
+  become: yes
+
+  tasks:
+
+    - name: Wait for EC2 instance to be fully ready
+      wait_for_connection:
+        delay: 10
+        timeout: 300
+
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install Nginx web server
+      apt:
+        name: nginx
+        state: present
+
+    - name: Ensure Nginx is started and enabled on boot
+      service:
+        name: nginx
+        state: started
+        enabled: yes
+
+    - name: Remove default Nginx welcome page
+      file:
+        path: /var/www/html/index.nginx-debian.html
+        state: absent
+
+    - name: Deploy index.html
+      copy:
+        src: "{{ playbook_dir }}/../index.html"
+        dest: /var/www/html/index.html
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Deploy style.css
+      copy:
+        src: "{{ playbook_dir }}/../style.css"
+        dest: /var/www/html/style.css
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Deploy app.js
+      copy:
+        src: "{{ playbook_dir }}/../app.js"
+        dest: /var/www/html/app.js
+        owner: www-data
+        group: www-data
+        mode: '0644'
+
+    - name: Reload Nginx to serve updated application
+      service:
+        name: nginx
+        state: reloaded
+
+    - name: Confirm all application files are in place
+      stat:
+        path: "{{ item }}"
+      register: file_checks
+      loop:
+        - /var/www/html/index.html
+        - /var/www/html/style.css
+        - /var/www/html/app.js
+
+    - name: Fail if any application file is missing
+      fail:
+        msg: "Application file {{ item.item }} was not deployed correctly"
+      when: not item.stat.exists
+      loop: "{{ file_checks.results }}"
