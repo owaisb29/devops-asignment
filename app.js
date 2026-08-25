@@ -4,6 +4,7 @@ const SPORTS = {
   lifting:  { label: 'Lifting',  abbr: 'LFT', color: '#8b5cf6', bg: '#f5f3ff', pillBorder: '#ddd6fe' },
   yoga:     { label: 'Yoga',     abbr: 'YOG', color: '#10b981', bg: '#ecfdf5', pillBorder: '#a7f3d0' },
   football: { label: 'Football', abbr: 'FB',  color: '#f59e0b', bg: '#fffbeb', pillBorder: '#fde68a' },
+  Swimming: { label: 'Swimming', abbr: 'FB',  color: '#f59e0b', bg: '#fffbeb', pillBorder: '#fde68a' }
 };
 
 const MOODS = [
