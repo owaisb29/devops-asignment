@@ -1,103 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FitTrack — Workout Tracker</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FitTrack</title>
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-    <!-- ── Header ── -->
-    <header>
-        <div class="header-inner">
-            <div class="logo">
-                <span class="logo-icon">🏋️</span>
-                <h1>FitTrack</h1>
-            </div>
-            <p class="tagline">Your personal workout log</p>
+  <header class="header">
+    <div class="logo-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9z"/>
+      </svg>
+    </div>
+    <div class="brand">Fit<em>Track</em></div>
+    <div class="header-sub">Your personal workout log</div>
+  </header>
+
+  <main class="main">
+
+    <!-- FORM -->
+    <div class="form-card">
+      <p class="section-label">Log a session</p>
+
+      <div class="field">
+        <label for="sport-sel">Sport</label>
+        <div class="select-wrap">
+          <select id="sport-sel">
+            <option value="running">Running</option>
+            <option value="lifting">Lifting</option>
+            <option value="yoga">Yoga</option>
+            <option value="football">Football</option>
+          </select>
         </div>
-    </header>
+        <div class="sport-pill" id="sport-pill">
+          <div class="sport-pill-dot" id="pill-dot"></div>
+          <span id="pill-text"></span>
+        </div>
+      </div>
 
-    <main class="container">
+      <div class="field">
+        <label>Rating</label>
+        <div class="stars" id="stars">
+          <button class="star-btn" data-n="1" aria-label="1 star">★</button>
+          <button class="star-btn" data-n="2" aria-label="2 stars">★</button>
+          <button class="star-btn" data-n="3" aria-label="3 stars">★</button>
+          <button class="star-btn" data-n="4" aria-label="4 stars">★</button>
+          <button class="star-btn" data-n="5" aria-label="5 stars">★</button>
+        </div>
+        <div class="mood-text" id="mood-text"></div>
+      </div>
 
-        <!-- ── Stats Bar ── -->
-        <section class="stats">
-            <div class="stat-card">
-                <span class="stat-number" id="stat-total">0</span>
-                <span class="stat-label">Total Workouts</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="stat-week">0</span>
-                <span class="stat-label">This Week</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="stat-avg">—</span>
-                <span class="stat-label">Avg Rating</span>
-            </div>
-            <div class="stat-card">
-                <span class="stat-number" id="stat-mins">0</span>
-                <span class="stat-label">Total Mins</span>
-            </div>
-        </section>
+      <div class="field">
+        <label for="date-in">Date</label>
+        <input type="date" id="date-in" />
+      </div>
 
-        <!-- ── Entry Form ── -->
-        <section class="form-card">
-            <h2 class="section-title">📝 Log a Workout</h2>
+      <div class="form-err" id="form-err"></div>
+      <button class="submit-btn" id="submit-btn">Add workout</button>
+    </div>
 
-            <div class="form-grid">
+    <!-- HISTORY -->
+    <section aria-label="Session history">
+      <div class="history-head">
+        <span class="section-label" style="margin-bottom:0">Session history</span>
+        <span class="history-count" id="hist-count"></span>
+      </div>
+      <div class="empty" id="empty-state">
+        <div class="empty-glyph">🏃</div>
+        <div class="empty-title">No sessions logged yet</div>
+        <div class="empty-hint">Add your first workout using the form.</div>
+      </div>
+      <div class="entries" id="entries" style="display:none"></div>
+    </section>
 
-                <div class="form-group">
-                    <label for="input-type">Workout Type</label>
-                    <select id="input-type">
-                        <option value="Running">🏃 Running</option>
-                        <option value="Weightlifting">🏋️ Weightlifting</option>
-                        <option value="Yoga">🧘 Yoga</option>
-                        <option value="HIIT">🔥 HIIT</option>
-                        <option value="Football">⚽ Football</option>
-                    </select>
-                </div>
+  </main>
 
-                <div class="form-group">
-                    <label for="input-date">Date</label>
-                    <input type="date" id="input-date">
-                </div>
-
-                <div class="form-group">
-                    <label for="input-duration">Duration (minutes)</label>
-                    <input type="number" id="input-duration" min="1" max="999" placeholder="e.g. 45">
-                </div>
-
-                <div class="form-group">
-                    <label>Rating</label>
-                    <div class="star-row" id="star-row">
-                        <span class="star" data-value="1">★</span>
-                        <span class="star" data-value="2">★</span>
-                        <span class="star" data-value="3">★</span>
-                        <span class="star" data-value="4">★</span>
-                        <span class="star" data-value="5">★</span>
-                    </div>
-                </div>
-
-                <div class="form-group full-width">
-                    <label for="input-notes">Notes (optional)</label>
-                    <textarea id="input-notes" placeholder="How did it feel? Any personal bests?"></textarea>
-                </div>
-
-            </div>
-
-            <button class="btn-add" id="btn-add">+ Add Entry</button>
-        </section>
-
-        <!-- ── Workout Log ── -->
-        <section class="log-section">
-            <h2 class="section-title">📋 Workout Log</h2>
-            <div class="workout-list" id="workout-list"></div>
-        </section>
-
-    </main>
-
-
-    <script src="script.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>

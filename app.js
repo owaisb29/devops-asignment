@@ -1,199 +1,128 @@
-// ── Constants ──────────────────────────────────
-const STORAGE_KEY = 'fittrack-workouts';
-
-const EMOJIS = {
-    Running:       '🏃',
-    Weightlifting: '🏋️',
-    Yoga:          '🧘',
-    HIIT:          '🔥'
+/* ─── Config ─── */
+const SPORTS = {
+  running:  { label: 'Running',  abbr: 'RUN', color: '#3b82f6', bg: '#eff6ff', pillBorder: '#bfdbfe' },
+  lifting:  { label: 'Lifting',  abbr: 'LFT', color: '#8b5cf6', bg: '#f5f3ff', pillBorder: '#ddd6fe' },
+  yoga:     { label: 'Yoga',     abbr: 'YOG', color: '#10b981', bg: '#ecfdf5', pillBorder: '#a7f3d0' },
+  football: { label: 'Football', abbr: 'FB',  color: '#f59e0b', bg: '#fffbeb', pillBorder: '#fde68a' },
 };
 
-// ── State ──────────────────────────────────────
-let currentRating = 0;
+const MOODS = [
+  '',
+  'Rough session',
+  'Getting there',
+  'Solid effort',
+  'Great workout!',
+  'Absolutely crushed it! 🔥',
+];
 
-// ── DOM References ─────────────────────────────
-const inputType     = document.getElementById('input-type');
-const inputDate     = document.getElementById('input-date');
-const inputDuration = document.getElementById('input-duration');
-const inputNotes    = document.getElementById('input-notes');
-const starRow       = document.getElementById('star-row');
-const starEls       = document.querySelectorAll('.star');
-const btnAdd        = document.getElementById('btn-add');
-const workoutList   = document.getElementById('workout-list');
-const toast         = document.getElementById('toast');
+/* ─── State ─── */
+let rating   = 0;
+let workouts = [];
 
-// ── Initialise ─────────────────────────────────
-inputDate.valueAsDate = new Date();
-render();
+/* ─── Element refs ─── */
+const sportSel   = document.getElementById('sport-sel');
+const pill       = document.getElementById('sport-pill');
+const pillDot    = document.getElementById('pill-dot');
+const pillText   = document.getElementById('pill-text');
+const starsWrap  = document.getElementById('stars');
+const moodText   = document.getElementById('mood-text');
+const dateIn     = document.getElementById('date-in');
+const formErr    = document.getElementById('form-err');
+const submitBtn  = document.getElementById('submit-btn');
+const emptyState = document.getElementById('empty-state');
+const entriesEl  = document.getElementById('entries');
+const histCount  = document.getElementById('hist-count');
+const starBtns   = [...starsWrap.querySelectorAll('.star-btn')];
 
-// ── Star Rating Logic ──────────────────────────
-starEls.forEach(star => {
-    // Click to set rating
-    star.addEventListener('click', () => {
-        currentRating = parseInt(star.dataset.value);
-        paintStars(currentRating);
-    });
+/* ─── Initialise ─── */
+dateIn.value = new Date().toISOString().split('T')[0];
+syncPill();
+render(null);
 
-    // Hover preview
-    star.addEventListener('mouseenter', () => {
-        paintStars(parseInt(star.dataset.value), true);
-    });
+/* ─── Sport pill ─── */
+sportSel.addEventListener('change', syncPill);
+
+function syncPill() {
+  const s = SPORTS[sportSel.value];
+  pill.style.background    = s.bg;
+  pill.style.borderColor   = s.pillBorder;
+  pill.style.color         = s.color;
+  pillDot.style.background = s.color;
+  pillText.textContent     = s.label;
+}
+
+/* ─── Star rating ─── */
+starBtns.forEach(btn => {
+  btn.addEventListener('click', () => {
+    rating = +btn.dataset.n;
+    paintStars(rating);
+    clearErr();
+  });
+  btn.addEventListener('mouseenter', () => paintStars(+btn.dataset.n, true));
+  btn.addEventListener('mouseleave', () => paintStars(rating));
 });
 
-// Reset to selected rating when mouse leaves
-starRow.addEventListener('mouseleave', () => {
-    paintStars(currentRating);
+function paintStars(n, preview = false) {
+  starBtns.forEach((b, i) => b.classList.toggle('lit', i < n));
+  moodText.textContent = (!preview && rating > 0) ? MOODS[rating]
+                       : (preview ? MOODS[n] : '');
+}
+
+/* ─── Submit ─── */
+submitBtn.addEventListener('click', () => {
+  if (!rating)       { showErr('Please rate your session.'); return; }
+  if (!dateIn.value) { showErr('Please choose a date.'); return; }
+  clearErr();
+
+  const id = Date.now();
+  workouts.unshift({ id, sport: sportSel.value, rating, date: dateIn.value });
+  rating = 0;
+  paintStars(0);
+  render(id);
 });
 
-function paintStars(count, preview = false) {
-    starEls.forEach(star => {
-        const val = parseInt(star.dataset.value);
-        if (val <= count) {
-            star.classList.add('active');
-        } else {
-            star.classList.remove('active');
-        }
-    });
+/* ─── Error helpers ─── */
+function showErr(msg) {
+  formErr.textContent   = '⚠ ' + msg;
+  formErr.style.display = 'flex';
 }
 
-// ── Add Entry ──────────────────────────────────
-btnAdd.addEventListener('click', addEntry);
-
-function addEntry() {
-    const type     = inputType.value;
-    const date     = inputDate.value;
-    const duration = parseInt(inputDuration.value);
-    const notes    = inputNotes.value.trim();
-
-    // Validation
-    if (!date) {
-        showToast('⚠️ Please select a date');
-        return;
-    }
-    if (!duration || duration < 1) {
-        showToast('⚠️ Please enter a valid duration');
-        return;
-    }
-    if (currentRating === 0) {
-        showToast('⚠️ Please select a rating');
-        return;
-    }
-
-    // Build entry object
-    const entry = {
-        id:       Date.now(),
-        type:     type,
-        date:     date,
-        duration: duration,
-        rating:   currentRating,
-        notes:    notes
-    };
-
-    // Save to localStorage
-    const workouts = loadWorkouts();
-    workouts.unshift(entry);
-    saveWorkouts(workouts);
-
-    // Reset form
-    inputDuration.value   = '';
-    inputNotes.value      = '';
-    inputDate.valueAsDate = new Date();
-    currentRating         = 0;
-    paintStars(0);
-
-    // Update the page
-    render();
-    showToast('Workout logged! 💪');
+function clearErr() {
+  formErr.style.display = 'none';
 }
 
-// ── Delete Entry ───────────────────────────────
-function deleteEntry(id) {
-    const workouts = loadWorkouts().filter(w => w.id !== id);
-    saveWorkouts(workouts);
-    render();
-    showToast('Entry removed');
+/* ─── Render history ─── */
+function fmtDate(d) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  });
 }
 
-// ── Storage Helpers ────────────────────────────
-function loadWorkouts() {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-}
+function render(freshId) {
+  const empty = workouts.length === 0;
+  emptyState.style.display = empty ? 'block'  : 'none';
+  entriesEl.style.display  = empty ? 'none'   : 'flex';
+  histCount.style.display  = empty ? 'none'   : 'inline';
+  if (empty) return;
 
-function saveWorkouts(data) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-}
+  histCount.textContent = workouts.length + (workouts.length === 1 ? ' session' : ' sessions');
+  entriesEl.innerHTML   = '';
 
-// ── Render ─────────────────────────────────────
-function render() {
-    const workouts = loadWorkouts();
-    updateStats(workouts);
-    renderList(workouts);
-}
-
-function updateStats(workouts) {
-    // Total workouts
-    document.getElementById('stat-total').textContent = workouts.length;
-
-    // This week
-    const now       = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - now.getDay());
-    weekStart.setHours(0, 0, 0, 0);
-
-    const thisWeek = workouts.filter(w => {
-        return new Date(w.date + 'T00:00:00') >= weekStart;
-    }).length;
-
-    document.getElementById('stat-week').textContent = thisWeek;
-
-    // Average rating
-    const avgRating = workouts.length
-        ? (workouts.reduce((sum, w) => sum + w.rating, 0) / workouts.length).toFixed(1)
-        : '—';
-    document.getElementById('stat-avg').textContent = avgRating;
-
-    // Total minutes
-    const totalMins = workouts.reduce((sum, w) => sum + w.duration, 0);
-    document.getElementById('stat-mins').textContent = totalMins;
-}
-
-function renderList(workouts) {
-    if (workouts.length === 0) {
-        workoutList.innerHTML = `
-            <div class="empty-state">
-                <span class="empty-icon">🏅</span>
-                <p>No workouts logged yet — add your first session above!</p>
-            </div>
-        `;
-        return;
-    }
-
-    workoutList.innerHTML = workouts.map(w => `
-        <div class="workout-card">
-            <div class="card-emoji">${EMOJIS[w.type] || '💪'}</div>
-            <div class="card-body">
-                <div class="card-type">${w.type}</div>
-                <div class="card-meta">
-                    <span>📅 ${formatDate(w.date)}</span>
-                    <span>⏱ ${w.duration} min</span>
-                    <span class="card-stars">${renderStars(w.rating)}</span>
-                </div>
-                ${w.notes ? `<div class="card-notes">"${w.notes}"</div>` : ''}
-            </div>
-            <button class="btn-delete" onclick="deleteEntry(${w.id})">Delete</button>
-        </div>
-    `).join('');
-}
-
-// ── Utility ────────────────────────────────────
-function formatDate(dateStr) {
-    return new Date(dateStr + 'T00:00:00').toLocaleDateString('en-GB', {
-        day:   'numeric',
-        month: 'short',
-        year:  'numeric'
-    });
-}
-
-function renderStars(count) {
-    return '★'.repeat(count) + '☆'.repeat(5 - count);
+  workouts.forEach(w => {
+    const s    = SPORTS[w.sport];
+    const card = document.createElement('div');
+    card.className = 'entry' + (w.id === freshId ? ' new' : '');
+    card.innerHTML = `
+      <div class="entry-bar" style="background:${s.color}"></div>
+      <div class="entry-badge" style="background:${s.bg}; color:${s.color}">${s.abbr}</div>
+      <div class="entry-meta">
+        <div class="entry-sport">${s.label}</div>
+        <div class="entry-date">${fmtDate(w.date)}</div>
+      </div>
+      <div class="entry-stars" aria-label="${w.rating} out of 5 stars">
+        ${[1, 2, 3, 4, 5].map(n => `<span class="${n <= w.rating ? 'sf' : 'se'}">★</span>`).join('')}
+      </div>
+    `;
+    entriesEl.appendChild(card);
+  });
 }
